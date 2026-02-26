@@ -4,15 +4,16 @@ An [Otoroshi](https://github.com/MAIF/otoroshi) plugin that validates [YouSign](
 
 ## How it works
 
-Every webhook sent by YouSign includes an `X-Yousign-Signature-256` header whose value is an HMAC-SHA256 hash of the raw request body, prefixed with `sha256=`.
+The plugin is provider-agnostic: the signature header, HMAC algorithm and prefix are all configurable. Out of the box it is pre-configured for YouSign, whose webhooks include an `X-Yousign-Signature-256` header containing an HMAC-SHA256 hash of the raw request body prefixed with `sha256=`.
 
 The plugin:
 
 1. Reads the raw request body.
-2. Computes `HMAC-SHA256(secret, rawBody)` using the secret configured in the plugin.
-3. Compares the result (constant-time, to prevent timing attacks) against the `X-Yousign-Signature-256` header.
-4. Forwards the request to your backend unchanged when the signature is valid.
-5. Returns **401 Unauthorized** when the signature is missing or invalid.
+2. Computes `HMAC-<algorithm>(secret, rawBody)` using the configured secret and algorithm.
+3. Prepends the configured prefix to the hex-encoded hash to form the expected signature.
+4. Compares the result (constant-time, to prevent timing attacks) against the configured signature header.
+5. Forwards the request to your backend unchanged when the signature is valid.
+6. Returns **401 Unauthorized** when the signature is missing or invalid.
 
 ## Create a route to receive YouSign webhooks
 
@@ -37,7 +38,10 @@ $ curl -X POST 'http://otoroshi-api.oto.tools:8080/api/routes' \
         "enabled": true,
         "plugin": "cp:otoroshi_plugins.com.cloud.apim.otoroshi.plugins.yousign.YouSignWebhookValidator",
         "config": {
-          "secret": "your-yousign-webhook-secret"
+          "secret": "your-yousign-webhook-secret",
+          "signature_header": "X-Yousign-Signature-256",
+          "algorithm": "HmacSHA256",
+          "prefix": "sha256="
         }
       }
     ]
@@ -46,15 +50,30 @@ $ curl -X POST 'http://otoroshi-api.oto.tools:8080/api/routes' \
 
 ## Plugin configuration
 
-| Field    | Type     | Required | Description                                                                                 |
-|----------|----------|----------|---------------------------------------------------------------------------------------------|
-| `secret` | `string` | yes      | The webhook secret copied from your YouSign App → Webhook subscription settings page.       |
+| Field              | Type     | Required | Default                    | Description                                                                          |
+|--------------------|----------|----------|----------------------------|--------------------------------------------------------------------------------------|
+| `secret`           | `string` | yes      | –                          | The HMAC secret shared with the webhook provider (e.g. YouSign webhook secret).      |
+| `signature_header` | `string` | no       | `X-Yousign-Signature-256`  | Name of the HTTP header that carries the signature.                                  |
+| `algorithm`        | `string` | no       | `HmacSHA256`               | Java HMAC algorithm name. Supported values: `HmacSHA256`, `HmacSHA512`, `HmacSHA384`, `HmacSHA1`. |
+| `prefix`           | `string` | no       | derived from `algorithm`   | String prepended to the hex hash before comparison (e.g. `sha256=`). Defaults are derived automatically from the chosen algorithm. |
 
 ```json
 {
-  "secret": "your-yousign-webhook-secret"
+  "secret": "your-webhook-secret",
+  "signature_header": "X-Yousign-Signature-256",
+  "algorithm": "HmacSHA256",
+  "prefix": "sha256="
 }
 ```
+
+### Algorithm / prefix defaults
+
+| `algorithm`  | Default `prefix` |
+|--------------|-----------------|
+| `HmacSHA256` | `sha256=`       |
+| `HmacSHA512` | `sha512=`       |
+| `HmacSHA384` | `sha384=`       |
+| `HmacSHA1`   | `sha1=`         |
 
 ## Responses
 
