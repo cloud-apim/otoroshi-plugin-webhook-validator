@@ -36,7 +36,7 @@ $ curl -X POST 'http://otoroshi-api.oto.tools:8080/api/routes' \
     "plugins": [
       {
         "enabled": true,
-        "plugin": "cp:otoroshi_plugins.com.cloud.apim.otoroshi.plugins.yousign.YouSignWebhookValidator",
+        "plugin": "cp:otoroshi_plugins.com.cloud.apim.otoroshi.plugins.webhook.WebhookPayloadValidator",
         "config": {
           "secret": "your-yousign-webhook-secret",
           "signature_header": "X-Yousign-Signature-256",
