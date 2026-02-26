@@ -15,6 +15,39 @@ The plugin:
 5. Forwards the request to your backend unchanged when the signature is valid.
 6. Returns **401 Unauthorized** when the signature is missing or invalid.
 
+## Create a route to receive GitHub webhooks
+
+```shell
+$ curl -X POST 'http://otoroshi-api.oto.tools:8080/api/routes' \
+  -H "Content-type: application/json" \
+  -u 'admin-api-apikey-id:admin-api-apikey-secret' \
+  -d '{
+    "name": "github-webhook-receiver",
+    "frontend": {
+      "domains": ["webhooks.oto.tools/github"]
+    },
+    "backend": {
+      "targets": [{
+        "hostname": "my-backend.example.com",
+        "port": 443,
+        "tls": true
+      }]
+    },
+    "plugins": [
+      {
+        "enabled": true,
+        "plugin": "cp:otoroshi_plugins.com.cloud.apim.otoroshi.plugins.webhook.WebhookPayloadValidator",
+        "config": {
+          "secret": "your-github-webhook-secret",
+          "signature_header": "X-Hub-Signature-256",
+          "algorithm": "HmacSHA256",
+          "prefix": "sha256="
+        }
+      }
+    ]
+  }'
+```
+
 ## Create a route to receive YouSign webhooks
 
 ```shell
@@ -50,17 +83,17 @@ $ curl -X POST 'http://otoroshi-api.oto.tools:8080/api/routes' \
 
 ## Plugin configuration
 
-| Field              | Type     | Required | Default                    | Description                                                                         |
-|--------------------|----------|----------|----------------------------|-------------------------------------------------------------------------------------|
-| `secret`           | `string` | yes      | –                          | The HMAC secret shared with the webhook provider.      |
-| `signature_header` | `string` | no       | `X-Yousign-Signature-256`  | Name of the HTTP header that carries the signature.                                 |
-| `algorithm`        | `string` | no       | `HmacSHA256`               | Java HMAC algorithm name. Supported values: `HmacSHA256`, `HmacSHA512`, `HmacSHA384`, `HmacSHA1`. |
-| `prefix`           | `string` | no       | derived from `algorithm`   | String prepended to the hex hash before comparison (e.g. `sha256=`). Defaults are derived automatically from the chosen algorithm. |
+| Field              | Type     | Required | Default                  | Description                                                                         |
+|--------------------|----------|----------|--------------------------|-------------------------------------------------------------------------------------|
+| `secret`           | `string` | yes      | –                        | The HMAC secret shared with the webhook provider.      |
+| `signature_header` | `string` | no       | `X-Hub-Signature-256`    | Name of the HTTP header that carries the signature.                                 |
+| `algorithm`        | `string` | no       | `HmacSHA256`             | Java HMAC algorithm name. Supported values: `HmacSHA256`, `HmacSHA512`, `HmacSHA384`, `HmacSHA1`. |
+| `prefix`           | `string` | no       | derived from `algorithm` | String prepended to the hex hash before comparison (e.g. `sha256=`). Defaults are derived automatically from the chosen algorithm. |
 
 ```json
 {
   "secret": "your-webhook-secret",
-  "signature_header": "X-Yousign-Signature-256",
+  "signature_header": "X-Hub-Signature-256",
   "algorithm": "HmacSHA256",
   "prefix": "sha256="
 }
@@ -77,11 +110,11 @@ $ curl -X POST 'http://otoroshi-api.oto.tools:8080/api/routes' \
 
 ## Responses
 
-| Status | Body | Meaning |
-|--------|------|---------|
-| forwarded to backend | – | Signature is valid, request is passed through unchanged. |
-| `401 Unauthorized` | `{ "error": "missing X-Yousign-Signature-256 header" }` | The header was not present in the incoming request. |
-| `401 Unauthorized` | `{ "error": "invalid signature" }` | The computed HMAC does not match the header value. |
+| Status | Body                                           | Meaning |
+|--------|------------------------------------------------|---------|
+| forwarded to backend | –                                              | Signature is valid, request is passed through unchanged. |
+| `401 Unauthorized` | `{ "error": "missing xxxx header" }`           | The header was not present in the incoming request. |
+| `401 Unauthorized` | `{ "error": "invalid signature" }`             | The computed HMAC does not match the header value. |
 | `401 Unauthorized` | `{ "error": "webhook secret not configured" }` | The plugin `secret` field is empty. |
 
 

@@ -19,7 +19,7 @@ import scala.util.{Failure, Success, Try}
 
 case class WebhookValidatorConfig(
   secret: String          = "",
-  signatureHeader: String = "X-Yousign-Signature-256",
+  signatureHeader: String = "X-Hub-Signature-256",
   algorithm: String       = "HmacSHA256",
   prefix: String          = "sha256=",
 ) extends NgPluginConfig {
@@ -39,7 +39,7 @@ object WebhookValidatorConfig {
       val algo = json.select("algorithm").asOpt[String].getOrElse("HmacSHA256")
       WebhookValidatorConfig(
         secret          = json.select("secret").asOpt[String].getOrElse(""),
-        signatureHeader = json.select("signature_header").asOpt[String].getOrElse("X-Yousign-Signature-256"),
+        signatureHeader = json.select("signature_header").asOpt[String].getOrElse("X-Hub-Signature-256"),
         algorithm       = algo,
         prefix          = json.select("prefix").asOpt[String].getOrElse(WebhookValidatorConfig.defaultPrefix(algo)),
       )
