@@ -11,9 +11,9 @@ lazy val excludesSlf4j = Seq(
 
 lazy val root = (project in file("."))
   .settings(
-    name := "otoroshi-plugin-yousign-webhook-validator",
+    name := "otoroshi-plugin-webhook-validator",
     assembly / test  := {},
-    assembly / assemblyJarName := "otoroshi-plugin-yousign-webhook-validator-assembly_2.12-dev.jar",
+    assembly / assemblyJarName := "otoroshi-plugin-webhook-validator-assembly_2.12-dev.jar",
     libraryDependencies ++= Seq(
       "fr.maif" %% "otoroshi" % "17.13.0" % "provided",
       munit % Test

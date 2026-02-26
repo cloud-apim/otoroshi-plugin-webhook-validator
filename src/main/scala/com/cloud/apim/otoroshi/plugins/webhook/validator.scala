@@ -1,4 +1,4 @@
-package otoroshi_plugins.com.cloud.apim.otoroshi.plugins.yousign
+package otoroshi_plugins.com.cloud.apim.otoroshi.plugins.webhook
 
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
@@ -17,31 +17,31 @@ import javax.crypto.spec.SecretKeySpec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
-case class YouSignWebhookValidatorConfig(
+case class WebhookValidatorConfig(
   secret: String          = "",
   signatureHeader: String = "X-Yousign-Signature-256",
   algorithm: String       = "HmacSHA256",
   prefix: String          = "sha256=",
 ) extends NgPluginConfig {
-  def json: JsValue = YouSignWebhookValidatorConfig.format.writes(this)
+  def json: JsValue = WebhookValidatorConfig.format.writes(this)
 }
 
-object YouSignWebhookValidatorConfig {
-  val default: YouSignWebhookValidatorConfig = YouSignWebhookValidatorConfig()
-  val format: Format[YouSignWebhookValidatorConfig] = new Format[YouSignWebhookValidatorConfig] {
-    override def writes(o: YouSignWebhookValidatorConfig): JsValue = Json.obj(
+object WebhookValidatorConfig {
+  val default: WebhookValidatorConfig = WebhookValidatorConfig()
+  val format: Format[WebhookValidatorConfig] = new Format[WebhookValidatorConfig] {
+    override def writes(o: WebhookValidatorConfig): JsValue = Json.obj(
       "secret"           -> o.secret,
       "signature_header" -> o.signatureHeader,
       "algorithm"        -> o.algorithm,
       "prefix"           -> o.prefix,
     )
-    override def reads(json: JsValue): JsResult[YouSignWebhookValidatorConfig] = Try {
+    override def reads(json: JsValue): JsResult[WebhookValidatorConfig] = Try {
       val algo = json.select("algorithm").asOpt[String].getOrElse("HmacSHA256")
-      YouSignWebhookValidatorConfig(
+      WebhookValidatorConfig(
         secret          = json.select("secret").asOpt[String].getOrElse(""),
         signatureHeader = json.select("signature_header").asOpt[String].getOrElse("X-Yousign-Signature-256"),
         algorithm       = algo,
-        prefix          = json.select("prefix").asOpt[String].getOrElse(YouSignWebhookValidatorConfig.defaultPrefix(algo)),
+        prefix          = json.select("prefix").asOpt[String].getOrElse(WebhookValidatorConfig.defaultPrefix(algo)),
       )
     } match {
       case Failure(e) => JsError(e.getMessage)
@@ -78,21 +78,21 @@ object YouSignWebhookValidatorConfig {
   ))
 }
 
-class YouSignWebhookValidator extends NgRequestTransformer {
+class WebhookPayloadValidator extends NgRequestTransformer {
 
-  private val logger = Logger("otoroshi-cloud-apim-yousign-webhook-validator")
+  private val logger = Logger("otoroshi-cloud-apim-webhook-payload-validator")
 
   override def steps: Seq[NgStep]                          = Seq(NgStep.TransformRequest)
   override def categories: Seq[NgPluginCategory]           = Seq(NgPluginCategory.AccessControl, NgPluginCategory.Custom("Cloud APIM"))
   override def visibility: NgPluginVisibility              = NgPluginVisibility.NgUserLand
   override def multiInstance: Boolean                      = true
   override def core: Boolean                               = false
-  override def name: String                                = "Cloud APIM - YouSign Webhook Validator"
-  override def description: Option[String]                 = Some("This plugin validates webhook payloads by verifying an HMAC signature. The header name, algorithm and prefix are all configurable (defaults to YouSign's X-Yousign-Signature-256 / HmacSHA256 / sha256=).")
-  override def defaultConfigObject: Option[NgPluginConfig] = Some(YouSignWebhookValidatorConfig.default)
+  override def name: String                                = "Cloud APIM - Webhook Payload Validator"
+  override def description: Option[String]                 = Some("This plugin validates webhook payloads by verifying an HMAC signature. The header name, algorithm and prefix are all configurable.")
+  override def defaultConfigObject: Option[NgPluginConfig] = Some(WebhookValidatorConfig.default)
   override def noJsForm: Boolean                           = false
-  override def configFlow: Seq[String]                     = YouSignWebhookValidatorConfig.configFlow
-  override def configSchema: Option[JsObject]              = YouSignWebhookValidatorConfig.configSchema
+  override def configFlow: Seq[String]                     = WebhookValidatorConfig.configFlow
+  override def configSchema: Option[JsObject]              = WebhookValidatorConfig.configSchema
 
   override def isTransformRequestAsync: Boolean            = true
   override def usesCallbacks: Boolean                      = false
@@ -101,7 +101,7 @@ class YouSignWebhookValidator extends NgRequestTransformer {
   override def transformsError: Boolean                    = false
 
   override def start(env: Env): Future[Unit] = {
-    env.logger.info("[Cloud APIM] the 'YouSign Webhook Validator' plugin is available !")
+    env.logger.info("[Cloud APIM] the 'Webhook Validator' plugin is available !")
     ().vfuture
   }
 
@@ -113,8 +113,7 @@ class YouSignWebhookValidator extends NgRequestTransformer {
   }
 
   override def transformRequest(ctx: NgTransformerRequestContext)(implicit env: Env, ec: ExecutionContext, mat: Materializer): Future[Either[Result, NgPluginHttpRequest]] = {
-    val config = ctx.cachedConfig(internalName)(YouSignWebhookValidatorConfig.format).getOrElse(YouSignWebhookValidatorConfig.default)
-
+    val config = ctx.cachedConfig(internalName)(WebhookValidatorConfig.format).getOrElse(WebhookValidatorConfig.default)
     if (config.secret.isEmpty) {
       logger.warn("[Webhook Validator] no secret configured, rejecting request")
       Left(Results.Unauthorized(Json.obj("error" -> "webhook secret not configured"))).vfuture
@@ -123,7 +122,6 @@ class YouSignWebhookValidator extends NgRequestTransformer {
         case None =>
           if (logger.isDebugEnabled) logger.debug(s"[Webhook Validator] missing ${config.signatureHeader} header")
           Left(Results.Unauthorized(Json.obj("error" -> s"missing ${config.signatureHeader} header"))).vfuture
-
         case Some(receivedSignature) =>
           ctx.otoroshiRequest.body.runFold(ByteString.empty)(_ ++ _).map { bodyBytes =>
             val computedHash      = computeHmac(config.algorithm, config.secret, bodyBytes)
@@ -133,7 +131,6 @@ class YouSignWebhookValidator extends NgRequestTransformer {
               logger.debug(s"[Webhook Validator] expected : $expectedSignature")
               logger.debug(s"[Webhook Validator] received : $receivedSignature")
             }
-
             // Constant-time comparison to prevent timing-attack side channels
             val expected = expectedSignature.getBytes("UTF-8")
             val received = receivedSignature.getBytes("UTF-8")

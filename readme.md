@@ -1,10 +1,10 @@
-# Cloud APIM – YouSign Webhook Validator – Otoroshi plugin
+# Cloud APIM – Webhook Validator – Otoroshi plugin
 
-An [Otoroshi](https://github.com/MAIF/otoroshi) plugin that validates [YouSign](https://developers.yousign.com/docs/use-webhooks-in-your-app) webhook payloads before they reach your backend.
+An [Otoroshi](https://github.com/MAIF/otoroshi) plugin that validates webhook payloads before they reach your backend using body payload signature validation.
 
 ## How it works
 
-The plugin is provider-agnostic: the signature header, HMAC algorithm and prefix are all configurable. Out of the box it is pre-configured for YouSign, whose webhooks include an `X-Yousign-Signature-256` header containing an HMAC-SHA256 hash of the raw request body prefixed with `sha256=`.
+The plugin is provider-agnostic: the signature header, HMAC algorithm and prefix are all configurable.
 
 The plugin:
 
@@ -50,10 +50,10 @@ $ curl -X POST 'http://otoroshi-api.oto.tools:8080/api/routes' \
 
 ## Plugin configuration
 
-| Field              | Type     | Required | Default                    | Description                                                                          |
-|--------------------|----------|----------|----------------------------|--------------------------------------------------------------------------------------|
-| `secret`           | `string` | yes      | –                          | The HMAC secret shared with the webhook provider (e.g. YouSign webhook secret).      |
-| `signature_header` | `string` | no       | `X-Yousign-Signature-256`  | Name of the HTTP header that carries the signature.                                  |
+| Field              | Type     | Required | Default                    | Description                                                                         |
+|--------------------|----------|----------|----------------------------|-------------------------------------------------------------------------------------|
+| `secret`           | `string` | yes      | –                          | The HMAC secret shared with the webhook provider.      |
+| `signature_header` | `string` | no       | `X-Yousign-Signature-256`  | Name of the HTTP header that carries the signature.                                 |
 | `algorithm`        | `string` | no       | `HmacSHA256`               | Java HMAC algorithm name. Supported values: `HmacSHA256`, `HmacSHA512`, `HmacSHA384`, `HmacSHA1`. |
 | `prefix`           | `string` | no       | derived from `algorithm`   | String prepended to the hex hash before comparison (e.g. `sha256=`). Defaults are derived automatically from the chosen algorithm. |
 
@@ -84,23 +84,10 @@ $ curl -X POST 'http://otoroshi-api.oto.tools:8080/api/routes' \
 | `401 Unauthorized` | `{ "error": "invalid signature" }` | The computed HMAC does not match the header value. |
 | `401 Unauthorized` | `{ "error": "webhook secret not configured" }` | The plugin `secret` field is empty. |
 
-## YouSign webhook headers
-
-The following headers are sent by YouSign on every webhook call:
-
-| Header | Description |
-|--------|-------------|
-| `X-Yousign-Signature-256` | `sha256=<hmac-sha256 hex>` – used by this plugin for payload authentication |
-| `X-Yousign-Retry` | Retry attempt counter (0 for the first delivery) |
-| `X-Yousign-Issued-At` | Timestamp of webhook transmission |
-| `Content-Type` | Always `application/json` |
-| `User-Agent` | Always `Yousign Webhook Bot` |
 
 ## Security notes
 
 - The plugin uses **constant-time byte comparison** (`MessageDigest.isEqual`) to prevent timing-based side-channel attacks.
-- YouSign only delivers webhooks over **HTTPS**; make sure your Otoroshi route is exposed on a TLS-enabled domain.
-- YouSign webhooks originate from the following CIDRs: `5.39.7.128/28`, `52.143.162.31`, `51.103.81.166`. You can add an Otoroshi IP allowlist plugin alongside this one for defence-in-depth.
 
 ## Build
 
@@ -108,6 +95,6 @@ The following headers are sent by YouSign on every webhook call:
 sbt assembly
 ```
 
-The resulting jar is placed in `target/scala-2.12/otoroshi-plugin-yousign-webhook-validator-assembly_2.12-dev.jar`.
+The resulting jar is placed in `target/scala-2.12/otoroshi-plugin-webhook-validator-assembly_2.12-dev.jar`.
 
 Copy it to your Otoroshi `plugins/` directory (or reference it via the classpath loader) and restart Otoroshi.
