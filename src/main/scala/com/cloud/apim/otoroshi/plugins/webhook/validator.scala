@@ -110,7 +110,7 @@ class WebhookPayloadValidator extends NgRequestTransformer {
   override def name: String                                = "Cloud APIM - Webhook Payload Validator"
   override def description: Option[String]                 = Some("This plugin validates webhook payloads by verifying an HMAC signature. The header name, algorithm, prefix and signing payload template are all configurable.")
   override def defaultConfigObject: Option[NgPluginConfig] = Some(WebhookValidatorConfig.default)
-  override def noJsForm: Boolean                           = false
+  override def noJsForm: Boolean                           = true 
   override def configFlow: Seq[String]                     = WebhookValidatorConfig.configFlow
   override def configSchema: Option[JsObject]              = WebhookValidatorConfig.configSchema
 
