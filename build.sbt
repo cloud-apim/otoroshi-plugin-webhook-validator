@@ -15,7 +15,7 @@ lazy val root = (project in file("."))
     assembly / test  := {},
     assembly / assemblyJarName := "otoroshi-plugin-webhook-validator-assembly_2.12-dev.jar",
     libraryDependencies ++= Seq(
-      "fr.maif" %% "otoroshi" % "17.13.0" % "provided",
+      "fr.maif" %% "otoroshi" % "17.15.0" % "provided",
       munit % Test
     )
   )
