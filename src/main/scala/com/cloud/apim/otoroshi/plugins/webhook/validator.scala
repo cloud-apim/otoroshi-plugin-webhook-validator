@@ -1,21 +1,31 @@
 package otoroshi_plugins.com.cloud.apim.otoroshi.plugins.webhook
 
-import akka.stream.Materializer
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 import otoroshi.env.Env
-import otoroshi.next.plugins.api._
-import otoroshi.next.proxy.NgProxyEngineError
-import otoroshi.utils.syntax.implicits._
+import otoroshi.next.plugins.api.*
+import otoroshi.utils.syntax.implicits.*
 import play.api.Logger
-import play.api.libs.json._
+import play.api.libs.json.*
 import play.api.mvc.{Result, Results}
 
+import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
+
+extension (bytes: Array[Byte]) {
+  private def hex: String = bytes.map(b => f"${b & 0xff}%02x").mkString
+}
+
+extension (self: String) {
+  // constant-time comparison to prevent timing-attack side channels
+  private def constantTimeEquals(other: String): Boolean =
+    MessageDigest.isEqual(self.getBytes(StandardCharsets.UTF_8), other.getBytes(StandardCharsets.UTF_8))
+}
 
 case class WebhookValidatorConfig(
   secret: String                   = "",
@@ -32,7 +42,7 @@ case class WebhookValidatorConfig(
 
 object WebhookValidatorConfig {
   val default: WebhookValidatorConfig = WebhookValidatorConfig()
-  val format: Format[WebhookValidatorConfig] = new Format[WebhookValidatorConfig] {
+  given format: Format[WebhookValidatorConfig] = new Format[WebhookValidatorConfig] {
     override def writes(o: WebhookValidatorConfig): JsValue = Json.obj(
       "secret"                    -> o.secret,
       "signature_header"          -> o.signatureHeader,
@@ -110,7 +120,7 @@ class WebhookPayloadValidator extends NgRequestTransformer {
   override def name: String                                = "Cloud APIM - Webhook Payload Validator"
   override def description: Option[String]                 = Some("This plugin validates webhook payloads by verifying an HMAC signature. The header name, algorithm, prefix and signing payload template are all configurable.")
   override def defaultConfigObject: Option[NgPluginConfig] = Some(WebhookValidatorConfig.default)
-  override def noJsForm: Boolean                           = true 
+  override def noJsForm: Boolean                           = true
   override def configFlow: Seq[String]                     = WebhookValidatorConfig.configFlow
   override def configSchema: Option[JsObject]              = WebhookValidatorConfig.configSchema
 
@@ -127,9 +137,9 @@ class WebhookPayloadValidator extends NgRequestTransformer {
 
   private def computeHmac(algorithm: String, secret: String, body: ByteString): String = {
     val mac     = Mac.getInstance(algorithm)
-    val keySpec = new SecretKeySpec(secret.getBytes("UTF-8"), algorithm)
+    val keySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), algorithm)
     mac.init(keySpec)
-    mac.doFinal(body.toArray).map(b => f"${b & 0xff}%02x").mkString
+    mac.doFinal(body.toArray).hex
   }
 
   private def buildSigningPayload(template: String, bodyBytes: ByteString, timestamp: String): ByteString = {
@@ -140,7 +150,7 @@ class WebhookPayloadValidator extends NgRequestTransformer {
     }
   }
 
-  override def transformRequest(ctx: NgTransformerRequestContext)(implicit env: Env, ec: ExecutionContext, mat: Materializer): Future[Either[Result, NgPluginHttpRequest]] = {
+  override def transformRequest(ctx: NgTransformerRequestContext)(using env: Env, ec: ExecutionContext, mat: Materializer): Future[Either[Result, NgPluginHttpRequest]] = {
     val config = ctx.cachedConfig(internalName)(WebhookValidatorConfig.format).getOrElse(WebhookValidatorConfig.default)
     if (config.secret.isEmpty) {
       logger.warn("[Webhook Validator] no secret configured, rejecting request")
@@ -183,11 +193,8 @@ class WebhookPayloadValidator extends NgRequestTransformer {
                   logger.debug(s"[Webhook Validator] expected : $expectedSignature")
                   logger.debug(s"[Webhook Validator] received : $receivedSignature")
                 }
-                // Constant-time comparison to prevent timing-attack side channels
-                val expected = expectedSignature.getBytes("UTF-8")
-                val received = receivedSignature.getBytes("UTF-8")
 
-                if (MessageDigest.isEqual(expected, received)) {
+                if (expectedSignature.constantTimeEquals(receivedSignature)) {
                   // Re-emit the already-consumed body so downstream plugins / the backend still see it
                   Right(ctx.otoroshiRequest.copy(body = Source.single(bodyBytes)))
                 } else {
