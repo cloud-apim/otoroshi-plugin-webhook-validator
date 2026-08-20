@@ -25,9 +25,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          sbt ';compile;package;assembly'
-          rm ./target/scala-3.8.4/otoroshi-plugin-webhook-validator_3-${{ inputs.version }}.jar 
-          mv ./target/scala-3.8.4/otoroshi-plugin-webhook-validator-assembly_3-dev.jar ./target/scala-3.8.4/otoroshi-plugin-webhook-validator_3-${{ inputs.version }}.jar
+          sbt ';compile;package'
       - name: Generate SHA-256
         run: |
           shasum -a 256 ./target/scala-3.8.4/otoroshi-plugin-webhook-validator_3-${{ inputs.version }}.jar | cut -d ' ' -f 1 > ./target/scala-3.8.4/otoroshi-plugin-webhook-validator_3-${{ inputs.version }}.jar.sha256

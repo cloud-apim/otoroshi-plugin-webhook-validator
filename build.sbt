@@ -21,8 +21,6 @@ lazy val root = (project in file("."))
       // itself silences the very same warning.
       "-Wconf:msg=package scala contains object and package with same name:s",
     ),
-    assembly / test  := {},
-    assembly / assemblyJarName := "otoroshi-plugin-webhook-validator-assembly_3-dev.jar",
     libraryDependencies ++= Seq(
       "fr.maif" %% "otoroshi" % "18.0.0-preview2" % "provided",
       munit % Test
