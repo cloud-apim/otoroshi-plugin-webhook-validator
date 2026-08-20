@@ -215,6 +215,6 @@ $ curl -X POST 'http://otoroshi-api.oto.tools:8080/api/routes' \
 sbt assembly
 ```
 
-The resulting jar is placed in `target/scala-2.12/otoroshi-plugin-webhook-validator-assembly_2.12-dev.jar`.
+The resulting jar is placed in `target/scala-3.8.4/otoroshi-plugin-webhook-validator-assembly_3-dev.jar`.
 
 Copy it to your Otoroshi `plugins/` directory (or reference it via the classpath loader) and restart Otoroshi.
